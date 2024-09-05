@@ -12,6 +12,18 @@ variables:
   SONAR_PROJECT_VERSION: '1.0'
 
 stages:
+  - stage: Docker
+    displayName: 'Build and Push Docker Image'
+    jobs:
+      - job: Build
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'cai-yaml-test'
+              repository: 'test'
+              command: 'buildAndPush'
+              Dockerfile: '**/Dockerfile'
+            displayName: 'Build and Push Docker Image'
   - stage: SonarQubeAnalysis
     displayName: 'SonarQube Analysis'
     jobs:
