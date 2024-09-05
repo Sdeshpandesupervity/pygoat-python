@@ -1,0 +1,61 @@
+
+
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  SONARQUBE_SERVER: 'https://sonar-dev.supervity.ai'
+  SONARQUBE_TOKEN: 'sqa_18ca7a4a75620b175378099dc7730a1eddf2a3b6'  # Store this securely in Azure DevOps
+  SONAR_PROJECT_KEY: 'python-test'
+  SONAR_PROJECT_NAME: 'python-test'
+  SONAR_PROJECT_VERSION: '1.0'
+
+stages:
+  - stage: SonarQubeAnalysis
+    displayName: 'SonarQube Analysis'
+    jobs:
+      - job: Analyze
+        steps:
+          - checkout: self
+            fetchDepth: 0  # Disable shallow fetch for better analysis relevance
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.x'
+              addToPath: true
+            displayName: 'Set up Python'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+          - script: |
+              # Download and install the latest SonarQube Scanner
+              wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.1.0.4477-linux.zip
+              unzip sonar-scanner-cli-6.1.0.4477-linux.zip
+              export PATH=$(pwd)/sonar-scanner-*/bin:$PATH
+            displayName: 'Install SonarQube Scanner'
+          - task: SonarQubePrepare@6
+            inputs:
+              SonarQube: 'sonarqube'  # Name of the SonarQube service connection in Azure DevOps
+              scannerMode: 'CLI'
+              configMode: 'manual'
+              cliProjectKey: '$(SONAR_PROJECT_KEY)'
+              cliProjectName: '$(SONAR_PROJECT_NAME)'
+              cliSources: '.'
+              extraProperties: |
+                sonar.projectVersion=$(SONAR_PROJECT_VERSION)
+                sonar.host.url=$(SONARQUBE_SERVER)
+                sonar.login=$(SONARQUBE_TOKEN)
+                sonar.python.version=3.x
+            displayName: 'Prepare SonarQube Analysis'
+
+          - task: SonarQubeAnalyze@6
+            inputs:
+              jdkversion: 'JAVA_HOME_17_X64'
+            displayName: 'Run SonarQube Analysis'
+          - task: SonarQubePublish@6
+            inputs:
+              pollingTimeoutSec: '300'
+            displayName: 'Publish Quality Gate Result'
