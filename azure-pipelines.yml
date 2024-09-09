@@ -28,7 +28,9 @@ steps:
   - script: |
       echo "NVD_API_KEY=${NVD_API_KEY}"
     displayName: 'Print Environment Variables'
-
+  - script: |
+      echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
+    displayName: 'Create Dependency-Check Properties File'
   # Run OWASP Dependency-Check
   - task: dependency-check-build-task@6
     inputs:
