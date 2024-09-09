@@ -1,11 +1,10 @@
 pool:
   vmImage: 'ubuntu-latest'
+
 variables:
   NVD_API_KEY: '854a248e-c7f6-4107-aac2-207fb9cab9c5'
 
-
 steps:
-
 
   # Set up Python environment
   - task: UsePythonVersion@0
@@ -25,19 +24,20 @@ steps:
       cyclonedx-py requirements -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
 
+  # Print environment variables for debugging
+  - script: |
+      echo "NVD_API_KEY=${NVD_API_KEY}"
+    displayName: 'Print Environment Variables'
+
   # Run OWASP Dependency-Check
   - task: dependency-check-build-task@6
     inputs:
-      projectName: 'pygoat-python'  # Specify your project name here
+      projectName: 'pygoat-python'
       scanPath: '$(Build.SourcesDirectory)'
       outputFormat: 'ALL'
       failOnCVSS: '7'
     env:
-      NVD_API_KEY: $(NVD_API_KEY)  # Pass the NVD API key from the pipeline environment variables
-
-
+      NVD_API_KEY: $(NVD_API_KEY)  # Ensure the API key is passed correctly
     displayName: 'Run OWASP Dependency-Check'
 
   # Publish the Dependency-Check report to Azure Storage Account
-
-
