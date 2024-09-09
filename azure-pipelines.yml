@@ -20,7 +20,7 @@ steps:
   # Generate SBOM using CycloneDX and store it in /reports/sbom.json
   - script: |
       pip install cyclonedx-bom
-      cyclonedx-py -r -o reports/sbom.json
+      cyclonedx-py environment -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
 
   # Run OWASP Dependency-Check (either via extension or manually)
@@ -45,9 +45,4 @@ steps:
   #   displayName: 'Run OWASP Dependency-Check with Docker'
 
   # Publish the Dependency-Check report
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathtoPublish: '$(Build.SourcesDirectory)/dependency-check-reports'
-      artifactName: 'dependency-check-reports'
-      publishLocation: 'Container'
-    displayName: 'Publish Dependency-Check Report'
+ 
