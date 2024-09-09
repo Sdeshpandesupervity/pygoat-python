@@ -29,6 +29,10 @@ steps:
       scanPath: '$(Build.SourcesDirectory)'
       outputFormat: 'ALL'
       failOnCVSS: '7'
+    env:
+      NVD_API_KEY: $(NVD_API_KEY)  # Pass the NVD API key from the pipeline environment variables
+
+
     displayName: 'Run OWASP Dependency-Check'
 
   # Publish the Dependency-Check report to Azure Storage Account
