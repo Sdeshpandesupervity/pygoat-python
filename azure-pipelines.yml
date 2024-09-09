@@ -1,5 +1,3 @@
-
-
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -47,3 +45,9 @@ steps:
   #   displayName: 'Run OWASP Dependency-Check with Docker'
 
   # Publish the Dependency-Check report
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.SourcesDirectory)/dependency-check-reports'
+      artifactName: 'dependency-check-reports'
+      publishLocation: 'Container'
+    displayName: 'Publish Dependency-Check Report'
