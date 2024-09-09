@@ -3,7 +3,7 @@ pool:
 
 steps:
   # Checkout your repository
-
+  - task: Checkout@1
 
   # Set up Python environment
   - task: UsePythonVersion@0
@@ -17,32 +17,21 @@ steps:
       pip install -r requirements.txt
     displayName: 'Install Python Dependencies'
 
-  # Generate SBOM using CycloneDX and store it in /reports/sbom.json
+  # Generate SBOM using CycloneDX based on requirements.txt
   - script: |
       pip install cyclonedx-bom
-      cyclonedx-py environment -o reports/sbom.json
+      cyclonedx-py requirements -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
 
-  # Run OWASP Dependency-Check (either via extension or manually)
-  # Option 1: Use OWASP Dependency-Check Extension
+  # Run OWASP Dependency-Check
   - task: dependency-check-build-task@6
     inputs:
+      projectName: 'pygoat-python'  # Specify your project name here
       scanPath: '$(Build.SourcesDirectory)'
       outputFormat: 'ALL'
       failOnCVSS: '7'
     displayName: 'Run OWASP Dependency-Check'
 
-  # Option 2: Run OWASP Dependency-Check manually using Docker
-  # Uncomment the following if you're using Docker
-  # - script: |
-  #     docker run --rm \
-  #     -v $(Build.SourcesDirectory):/src \
-  #     -v $(Build.SourcesDirectory)/dependency-check-reports:/report \
-  #     owasp/dependency-check \
-  #     --scan /src \
-  #     --format "ALL" \
-  #     --out /report
-  #   displayName: 'Run OWASP Dependency-Check with Docker'
+  # Publish the Dependency-Check report to Azure Storage Account
 
-  # Publish the Dependency-Check report
- 
+
