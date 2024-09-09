@@ -29,7 +29,7 @@ steps:
   - task: dependency-check-build-task@6
     inputs:
       projectName: 'pygoat-python'  # Specify your project name here
-      scanPath: '$(Build.SourcesDirectory)/src'
+      scanPath: '$(Build.SourcesDirectory)'
       outputFormat: 'ALL'
       failOnCVSS: '7'
     env:
