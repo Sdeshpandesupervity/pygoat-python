@@ -1,5 +1,8 @@
 pool:
   vmImage: 'ubuntu-latest'
+variables:
+  NVD_API_KEY: '854a248e-c7f6-4107-aac2-207fb9cab9c5'
+
 
 steps:
 
@@ -30,7 +33,7 @@ steps:
       outputFormat: 'ALL'
       failOnCVSS: '7'
     env:
-      NVD_API_KEY: '854a248e-c7f6-4107-aac2-207fb9cab9c5'  # Pass the NVD API key from the pipeline environment variables
+      NVD_API_KEY: $(NVD_API_KEY)  # Pass the NVD API key from the pipeline environment variables
 
 
     displayName: 'Run OWASP Dependency-Check'
