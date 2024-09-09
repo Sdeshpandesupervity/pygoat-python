@@ -3,7 +3,7 @@ pool:
 
 steps:
   # Checkout your repository
-  - task: Checkout@1
+
 
   # Set up Python environment
   - task: UsePythonVersion@0
