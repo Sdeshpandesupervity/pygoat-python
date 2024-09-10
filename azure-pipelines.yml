@@ -23,7 +23,11 @@ steps:
       pip install cyclonedx-bom
       cyclonedx-py requirements -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
-
+  - script: |
+      wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
+      unzip dependency-check-10.0.4-release.zip -d dependency-check
+      export PATH=$(pwd)/dependency-check/bin:$PATH
+    displayName: 'Download and Set Up OWASP Dependency-Check'
   # Print environment variables for debugging
   - script: |
       echo "NVD_API_KEY=${NVD_API_KEY}"
