@@ -1,9 +1,6 @@
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  NVD_API_KEY: '854a248e-c7f6-4107-aac2-207fb9cab9c5'
-
 steps:
 
   # Set up Python environment
@@ -24,13 +21,11 @@ steps:
       cyclonedx-py requirements -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
 
-  # Print environment variables for debugging
+  # Create Dependency-Check properties file (without API key)
   - script: |
-      echo "NVD_API_KEY=${NVD_API_KEY}"
-    displayName: 'Print Environment Variables'
-  - script: |
-      echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
+      echo "" > dependency-check.properties  # Empty properties file, no API key
     displayName: 'Create Dependency-Check Properties File'
+
   # Run OWASP Dependency-Check
   - task: dependency-check-build-task@6
     inputs:
@@ -38,8 +33,12 @@ steps:
       scanPath: '$(Build.SourcesDirectory)'
       outputFormat: 'ALL'
       failOnCVSS: '7'
-    env:
-      NVD_API_KEY: $(NVD_API_KEY)  # Ensure the API key is passed correctly
     displayName: 'Run OWASP Dependency-Check'
 
   # Publish the Dependency-Check report to Azure Storage Account
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: '$(Build.ArtifactStagingDirectory)/dependency-check-reports'
+      artifactName: 'dependency-check-reports'
+      publishLocation: 'Container'
+    displayName: 'Publish Dependency-Check Report'
