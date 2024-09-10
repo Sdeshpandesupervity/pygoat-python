@@ -31,6 +31,11 @@ steps:
   - script: |
       echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
     displayName: 'Create Dependency-Check Properties File'
+  - script: |
+      wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
+      unzip dependency-check-10.0.4-release.zip -d dependency-check
+      export PATH=$(pwd)/dependency-check/bin:$PATH
+    displayName: 'Download and Set Up OWASP Dependency-Check'
   # Run OWASP Dependency-Check
   - task: dependency-check-build-task@6
     inputs:
