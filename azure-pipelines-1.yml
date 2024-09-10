@@ -1,0 +1,43 @@
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  NVD_API_KEY: 'b8d0a20b-f9a6-4d11-b6ab-f0df5e6b7160  '
+
+steps:
+
+  # Set up Python environment
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
+
+  # Install necessary Python dependencies
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Install Python Dependencies'
+
+  # Generate SBOM using CycloneDX based on requirements.txt
+  - script: |
+      pip install cyclonedx-bom
+      cyclonedx-py requirements -o reports/sbom.json
+    displayName: 'Generate SBOM using CycloneDX'
+
+  # Print environment variables for debugging
+  - script: |
+      echo "NVD_API_KEY=${NVD_API_KEY}"
+    displayName: 'Print Environment Variables'
+  - script: |
+      echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
+    displayName: 'Create Dependency-Check Properties File'
+  # Run OWASP Dependency-Check
+  - task: dependency-check-build-task@6
+    inputs:
+      projectName: 'pygoat-python'
+      scanPath: '$(Build.SourcesDirectory)'
+      outputFormat: 'ALL'
+      failOnCVSS: '7'
+    env:
+      NVD_API_KEY: $(NVD_API_KEY)  # Ensure the API key is passed correctly
+    displayName: 'Run OWASP Dependency-Check'
