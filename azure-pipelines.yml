@@ -27,6 +27,11 @@ steps:
       wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
       unzip dependency-check-10.0.4-release.zip -d dependency-check
       export PATH=$(pwd)/dependency-check/bin:$PATH
+      dependency-check/bin/dependency-check.sh --updateonly --cveValidForHours 168 --data nvd-data
+      git add nvd-data
+      git commit -m "Add NVD data to repository"
+      git push origin master
+
     displayName: 'Download and Set Up OWASP Dependency-Check'
   # Print environment variables for debugging
   - script: |
@@ -36,14 +41,18 @@ steps:
       echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
     displayName: 'Create Dependency-Check Properties File'
   # Run OWASP Dependency-Check
-  - task: dependency-check-build-task@6
+  - script: |
+      dependency-check/bin/dependency-check.sh \
+      --project "pygoat-python" \
+      --out "$(Build.SourcesDirectory)/dependency-check-report" \
+      --scan "$(Build.SourcesDirectory)" \
+      --data "$(Build.SourcesDirectory)/nvd-data" \
+      --format ALL --failOnCVSS 7
+    displayName: 'Run OWASP Dependency-Check using Pre-Downloaded NVD Data'
+  - task: PublishBuildArtifacts@1
     inputs:
-      projectName: 'pygoat-python'
-      scanPath: '$(Build.SourcesDirectory)'
-      outputFormat: 'ALL'
-      failOnCVSS: '7'
-    env:
-      NVD_API_KEY: $(NVD_API_KEY)  # Ensure the API key is passed correctly
-    displayName: 'Run OWASP Dependency-Check'
+      PathtoPublish: '$(Build.SourcesDirectory)/dependency-check-report'
+      ArtifactName: 'DependencyCheckReport'
+    displayName: 'Publish Dependency-Check Report'
 
   # Publish the Dependency-Check report to Azure Storage Account
