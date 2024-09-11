@@ -51,8 +51,11 @@ steps:
       --format ALL --failOnCVSS 7
     displayName: 'Run OWASP Dependency-Check using Pre-Downloaded NVD Data'
 
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: '$(Build.SourcesDirectory)/dependency-check-report'
-      ArtifactName: 'DependencyCheckReport'
-    displayName: 'Publish Dependency-Check Report'
+  - script: |
+      # Upload the dependency-check-report folder as a ZIP file
+      tar -czvf dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
+      az storage blob upload \
+        --container-name test \
+        --name dependency-check-report.tar.gz \
+        --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
+        --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
