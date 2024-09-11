@@ -2,7 +2,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  NVD_API_KEY: 'a254d0f1-951c-47d2-baac-f88712b7b7a3'
+  NVD_API_KEY: '583d3d52-3151-4e1f-87d5-363aa1729939'
 
 steps:
 
@@ -23,23 +23,20 @@ steps:
       pip install cyclonedx-bom
       cyclonedx-py requirements -o reports/sbom.json
     displayName: 'Generate SBOM using CycloneDX'
+
+  # Download NVD Data using API Key
+  - script: |
+      curl -H "apiKey: ${NVD_API_KEY}" "https://services.nvd.nist.gov/rest/json/cves/1.0?startIndex=0&resultsPerPage=10" > nvd-cve-data.json
+    displayName: 'Download NVD Data'
+
+  # Set up Dependency-Check
   - script: |
       wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
       unzip dependency-check-10.0.4-release.zip -d dependency-check
       export PATH=$(pwd)/dependency-check/bin:$PATH
-      dependency-check/bin/dependency-check.sh --updateonly --cveValidForHours 168 --data nvd-data
-      git add nvd-data
-      git commit -m "Add NVD data to repository"
-      git push origin master
-
-    displayName: 'Download and Set Up OWASP Dependency-Check'
-  # Print environment variables for debugging
-  - script: |
-      echo "NVD_API_KEY=${NVD_API_KEY}"
-    displayName: 'Print Environment Variables'
-  - script: |
       echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
-    displayName: 'Create Dependency-Check Properties File'
+    displayName: 'Download and Set Up OWASP Dependency-Check'
+
   # Run OWASP Dependency-Check
   - script: |
       dependency-check/bin/dependency-check.sh \
@@ -49,10 +46,9 @@ steps:
       --data "$(Build.SourcesDirectory)/nvd-data" \
       --format ALL --failOnCVSS 7
     displayName: 'Run OWASP Dependency-Check using Pre-Downloaded NVD Data'
+
   - task: PublishBuildArtifacts@1
     inputs:
       PathtoPublish: '$(Build.SourcesDirectory)/dependency-check-report'
       ArtifactName: 'DependencyCheckReport'
     displayName: 'Publish Dependency-Check Report'
-
-  # Publish the Dependency-Check report to Azure Storage Account
