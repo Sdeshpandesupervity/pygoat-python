@@ -33,6 +33,7 @@ steps:
   - script: |
       wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
       unzip dependency-check-10.0.4-release.zip -d dependency-check
+      chmod +x dependency-check/bin/dependency-check.sh
       echo "Directory contents after extraction:"
       ls -R
       export PATH=$(pwd)/dependency-check/bin:$PATH
