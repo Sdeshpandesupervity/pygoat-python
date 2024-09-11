@@ -33,6 +33,8 @@ steps:
   - script: |
       wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
       unzip dependency-check-10.0.4-release.zip -d dependency-check
+      echo "Directory contents after extraction:"
+      ls -R
       export PATH=$(pwd)/dependency-check/bin:$PATH
       echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
     displayName: 'Download and Set Up OWASP Dependency-Check'
