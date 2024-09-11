@@ -52,10 +52,22 @@ steps:
     displayName: 'Run OWASP Dependency-Check using Pre-Downloaded NVD Data'
 
   - script: |
-      # Upload the dependency-check-report folder as a ZIP file
-      tar -czvf dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
+      if [ ! -d "$(Build.SourcesDirectory)/dependency-check-report" ]; then
+        echo "Directory $(Build.SourcesDirectory)/dependency-check-report does not exist."
+        exit 1
+      fi
+      echo "Directory exists."
+    displayName: 'Check if Dependency-Check Report Directory Exists'
+
+  # Upload Dependency-Check Report to Azure Blob Storage
+  - script: |
+      tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
+      echo "Tarball created:"
+      ls -l $(Build.SourcesDirectory)/dependency-check-report.tar.gz
+
       az storage blob upload \
         --container-name test \
         --name dependency-check-report.tar.gz \
         --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
-        --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
+        --connection-string "$(AZURE_STORAGE_CONNECTION_STRING)"
+    displayName: 'Upload Dependency-Check Report to Azure Storage'
