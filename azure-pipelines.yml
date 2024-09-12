@@ -68,5 +68,6 @@ steps:
         --container-name test \
         --name dependency-check-report.tar.gz \
         --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
-        --connection-string "$(AZURE_STORAGE_CONNECTION_STRING)"
+        --connection-string $(AZURE_STORAGE_CONNECTION_STRING) \
+        --overwrite
     displayName: 'Upload Dependency-Check Report to Azure Storage'
