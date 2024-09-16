@@ -1,0 +1,100 @@
+# Pipeline for Trivy and OWASP Dependency-Check, building Docker image and sending reports
+
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: StorageVariables
+
+stages:
+  - stage: TrivySBOMScan
+    displayName: 'Trivy Scan for GitHub Repository'
+    jobs:
+    - job: trivy_scan
+      displayName: 'Trivy Repository Scan'
+      steps:
+        - checkout: self
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.x'
+            addToPath: true
+        - script: |
+            pip install cyclonedx-bom
+            trivy fs --format cyclonedx --output report/sbom.json .
+            echo "SBOM generated with Trivy"
+        - task: AzureFileCopy@4
+          inputs:
+            sourcePath: $(Build.SourcesDirectory)/report/sbom.json
+            azureSubscription: 'Azure Subscription'
+            destination: 'AzureBlob'
+            storage: '$(azureStorageConnectionString)'
+            containerName: 'test'
+  
+  - stage: OWASPDependencyCheck
+    displayName: 'OWASP Dependency Check'
+    jobs:
+    - job: owasp_dependency_check
+      displayName: 'Dependency Check'
+      steps:
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.x'
+            addToPath: true
+        - script: |
+            wget https://github.com/jeremylong/DependencyCheck/releases/download/v6.5.3/dependency-check-6.5.3-release.zip
+            unzip dependency-check-6.5.3-release.zip -d dependency-check
+            ./dependency-check/bin/dependency-check.sh --scan ./ --out reports/
+        - task: AzureFileCopy@4
+          inputs:
+            sourcePath: $(Build.SourcesDirectory)/reports/
+            azureSubscription: 'Azure Subscription'
+            destination: 'AzureBlob'
+            storage: '$(azureStorageConnectionString)'
+            containerName: 'test'
+
+  - stage: Build
+    displayName: 'Build and Push the image to Docker Hub'
+    jobs:
+    - job: Build
+      displayName: 'Build Docker Image'
+      steps:
+        - task: Docker@2
+          inputs:
+            containerRegistry: '$(containerRegistry)'
+            repository: '$(imageName)'
+            command: 'buildAndPush'
+            Dockerfile: '**/Dockerfile'
+            tags: |
+              $(Build.BuildId)
+        - task: Docker@2
+          inputs:
+            containerRegistry: '$(containerRegistry)'
+            repository: '$(imageName)'
+            command: 'push'
+            tags: |
+              $(Build.BuildId)
+  
+  - stage: TrivyImageScan
+    displayName: 'Trivy Scan on Docker Image'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+    - job: image_scan
+      displayName: 'Trivy Image Scan'
+      steps:
+        - task: Docker@2
+          inputs:
+            containerRegistry: '$(containerRegistry)'
+            command: 'login'
+        - script: |
+            trivy image --format cyclonedx --output report/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
+            echo "SBOM for Docker image generated with Trivy"
+        - task: AzureFileCopy@4
+          inputs:
+            sourcePath: $(Build.SourcesDirectory)/report/image-sbom.json
+            azureSubscription: 'Azure Subscription'
+            destination: 'AzureBlob'
+            storage: '$(azureStorageConnectionString)'
+            containerName: 'test'
+
