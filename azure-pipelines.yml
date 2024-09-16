@@ -85,6 +85,7 @@ stages:
               --name dependency-check-report.tar.gz \
               --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
               --connection-string "$(azureStorageConnectionString)"
+              --overwrite
 
   - stage: BuildAndPush
     displayName: 'Build and Push Docker Image'
