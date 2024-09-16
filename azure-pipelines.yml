@@ -4,70 +4,118 @@ pool:
 variables:
   - group: StorageVariables
 
-steps:
+stages:
+  - stage: SonarQubeAnalysis
+    displayName: 'SonarQube Analysis'
+    jobs:
+      - job: Analyze
+        steps:
+          - checkout: self
+            fetchDepth: 0
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.x'
+              addToPath: true
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+          - script: |
+              wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.1.0.4477-linux.zip
+              unzip sonar-scanner-cli-6.1.0.4477-linux.zip
+              export PATH=$(pwd)/sonar-scanner-*/bin:$PATH
+          - task: SonarQubePrepare@6
+            inputs:
+              SonarQube: 'sonarqube'
+              scannerMode: 'CLI'
+              configMode: 'manual'
+              cliProjectKey: 'python-test'
+              cliSources: '.'
+              extraProperties: |
+                sonar.projectVersion=1.0
+                sonar.host.url=$(SONARQUBE_SERVER)
+                sonar.login=$(SONARQUBE_TOKEN)
+          - task: SonarQubeAnalyze@6
+          - task: SonarQubePublish@6
+            inputs:
+              pollingTimeoutSec: '300'
 
-  # Set up Python environment
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.x'
-      addToPath: true
+  - stage: TrivyRepoScan
+    displayName: 'Trivy Repository Scan'
+    dependsOn:
+    - SonarQubeAnalysis
+    jobs:
+      - job: RepoScan
+        steps:
+          - script: |
+              sudo apt-get install -y wget
+              wget https://github.com/aquasecurity/trivy/releases/download/v0.33.0/trivy_0.33.0_Linux-64bit.deb
+              sudo dpkg -i trivy_0.33.0_Linux-64bit.deb
+          - script: |
+              trivy fs --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json .
+          - script: |
+              az storage blob upload \
+              --container-name test \
+              --file $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json \
+              --name trivy-repo-sbom.json \
+              --connection-string $(azureStorageConnectionString)
 
-  # Install necessary Python dependencies
-  - script: |
-      python -m pip install --upgrade pip
-      pip install -r requirements.txt
-    displayName: 'Install Python Dependencies'
+  - stage: OWASPDependencyCheck
+    displayName: 'OWASP Dependency Check'
+    dependsOn:
+    - TrivyRepoScan
+    jobs:
+      - job: DependencyCheck
+        steps:
+          - script: |
+              wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
+              unzip dependency-check-10.0.4-release.zip -d dependency-check
+              chmod +x dependency-check/bin/dependency-check.sh
+              export PATH=$(pwd)/dependency-check/bin:$PATH
+              echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
+          - script: |
+              dependency-check/bin/dependency-check.sh \
+              --project "pygoat-python" \
+              --out "$(Build.SourcesDirectory)/dependency-check-report" \
+              --scan "$(Build.SourcesDirectory)" \
+              --format ALL --failOnCVSS 7
+          - script: |
+              tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
+              az storage blob upload \
+              --container-name test \
+              --name dependency-check-report.tar.gz \
+              --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
+              --connection-string "$(azureStorageConnectionString)"
 
-  # Generate SBOM using CycloneDX based on requirements.txt
-  - script: |
-      pip install cyclonedx-bom
-      cyclonedx-py requirements -o reports/sbom.json
-    displayName: 'Generate SBOM using CycloneDX'
+  - stage: BuildAndPush
+    displayName: 'Build and Push Docker Image'
+    dependsOn:
+    - OWASPDependencyCheck
+    jobs:
+      - job: Build
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: '$(containerRegistry)'
+              repository: '$(imageName)'
+              command: 'buildAndPush'
+              Dockerfile: '**/Dockerfile'
+              tags: |
+                $(Build.BuildId)
 
-  # Download NVD Data using API Key
-  - script: |
-      curl -H "apiKey: ${NVD_API_KEY}" "https://services.nvd.nist.gov/rest/json/cves/1.0?startIndex=0&resultsPerPage=10" > nvd-cve-data.json
-    displayName: 'Download NVD Data'
-
-  # Set up Dependency-Check
-  - script: |
-      wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
-      unzip dependency-check-10.0.4-release.zip -d dependency-check
-      chmod +x dependency-check/bin/dependency-check.sh
-      echo "Directory contents after extraction:"
-      ls -R
-      export PATH=$(pwd)/dependency-check/bin:$PATH
-      echo "nvd.api.key=${NVD_API_KEY}" > dependency-check.properties
-    displayName: 'Download and Set Up OWASP Dependency-Check'
-
-  # Run OWASP Dependency-Check
-  - script: |
-      dependency-check/bin/dependency-check.sh \
-      --project "pygoat-python" \
-      --out "$(Build.SourcesDirectory)/dependency-check-report" \
-      --scan "$(Build.SourcesDirectory)" \
-      --data "$(Build.SourcesDirectory)/nvd-data" \
-      --format ALL --failOnCVSS 7
-    displayName: 'Run OWASP Dependency-Check using Pre-Downloaded NVD Data'
-
-  - script: |
-      if [ ! -d "$(Build.SourcesDirectory)/dependency-check-report" ]; then
-        echo "Directory $(Build.SourcesDirectory)/dependency-check-report does not exist."
-        exit 1
-      fi
-      echo "Directory exists."
-    displayName: 'Check if Dependency-Check Report Directory Exists'
-
-  # Upload Dependency-Check Report to Azure Blob Storage
-  - script: |
-      tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
-      echo "Tarball created:"
-      ls -l $(Build.SourcesDirectory)/dependency-check-report.tar.gz
-
-      az storage blob upload \
-        --container-name test \
-        --name dependency-check-report.tar.gz \
-        --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
-        --connection-string "$(AZURE_STORAGE_CONNECTION_STRING)" \
-        --overwrite
-    displayName: 'Upload Dependency-Check Report to Azure Storage'
+  - stage: TrivyImageScan
+    displayName: 'Trivy Image Scan'
+    dependsOn: BuildAndPush
+    jobs:
+      - job: ImageScan
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: '$(containerRegistry)'
+              command: 'login'
+          - script: |
+              trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
+              az storage blob upload \
+              --container-name test \
+              --file $(Build.ArtifactStagingDirectory)/image-sbom.json \
+              --name image-sbom.json \
+              --connection-string $(azureStorageConnectionString)
