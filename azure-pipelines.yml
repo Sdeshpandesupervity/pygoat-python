@@ -64,29 +64,29 @@ stages:
     dependsOn:
     - TrivyRepoScan
     jobs:
-      - job: DependencyCheck
-        steps:
-          - script: |
-              wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
-              unzip dependency-check-10.0.4-release.zip -d dependency-check
-              chmod +x dependency-check/bin/dependency-check.sh
-              export PATH=$(pwd)/dependency-check/bin:$PATH
-              echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
-          - script: |
-              dependency-check/bin/dependency-check.sh \
-              --project "pygoat-python" \
-              --out "$(Build.SourcesDirectory)/dependency-check-report" \
-              --scan "$(Build.SourcesDirectory)" \
-              --format ALL --failOnCVSS 7
-              --overwrite
-          - script: |
-              tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
-              az storage blob upload \
-              --container-name test \
-              --name dependency-check-report.tar.gz \
-              --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
-              --connection-string "$(azureStorageConnectionString)"
-              --overwrite
+    - job: DependencyCheck
+      steps:
+        - script: |
+            wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
+            unzip dependency-check-10.0.4-release.zip -d dependency-check
+            chmod +x dependency-check/bin/dependency-check.sh
+            export PATH=$(pwd)/dependency-check/bin:$PATH
+            echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
+        - script: |
+            dependency-check/bin/dependency-check.sh \
+            --project "pygoat-python" \
+            --out "$(Build.SourcesDirectory)/dependency-check-report" \
+            --scan "$(Build.SourcesDirectory)" \
+            --format ALL --failOnCVSS 7 \
+            --overwrite  # Placed correctly here
+        - script: |
+            tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
+            az storage blob upload \
+            --container-name test \
+            --name dependency-check-report.tar.gz \
+            --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
+            --connection-string "$(azureStorageConnectionString)" \
+            --overwrite  # Placed correctly here
 
   - stage: BuildAndPush
     displayName: 'Build and Push Docker Image'
