@@ -114,6 +114,11 @@ stages:
               containerRegistry: '$(containerRegistry)'
               command: 'login'
           - script: |
+              sudo apt-get update
+              sudo apt-get install -y wget
+              wget https://github.com/aquasecurity/trivy/releases/download/v0.33.0/trivy_0.33.0_Linux-64bit.deb
+              sudo dpkg -i trivy_0.33.0_Linux-64bit.deb
+          - script: |
               trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
               az storage blob upload \
               --container-name test \
