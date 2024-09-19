@@ -68,6 +68,8 @@ stages:
               echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
           - script: |
               dependency-check/bin/dependency-check.sh --project "pygoat-python" --out "$(Build.SourcesDirectory)/dependency-check-report" --scan "$(Build.SourcesDirectory)" --format ALL --failOnCVSS 7 --overwrite
+              echo "Dependency Check Report generated at: $(Build.SourcesDirectory)/dependency-check-report"
+              ls -la "$(Build.SourcesDirectory)/dependency-check-report"
           - task: AzureCLI@2
             inputs:
               azureSubscription: 'az-storageaccount-access-test'
