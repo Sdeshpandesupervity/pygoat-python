@@ -54,7 +54,12 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                az storage blob upload --container-name test --file $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json --name trivy-repo-sbom.json --overwrite
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json \
+                  --name trivy-repo-sbom.json \
+                  --overwrite
 
           - script: |
               wget -q https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
@@ -70,7 +75,12 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
-                az storage blob upload --container-name test --name dependency-check-report.tar.gz --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz --overwrite
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
+                  --name dependency-check-report.tar.gz \
+                  --overwrite
 
   - stage: BuildAndScanImage
     displayName: 'Build and Image Scan'
@@ -90,7 +100,7 @@ stages:
         steps:
           - task: Docker@2
             inputs:
-              containerRegistry: '$(containerRegistry)'
+              containerRegistry: 'sumedhdocker'
               command: 'login'
           - script: |
               sudo apt-get update
@@ -98,12 +108,16 @@ stages:
               wget -q https://github.com/aquasecurity/trivy/releases/download/v0.33.0/trivy_0.33.0_Linux-64bit.deb
               sudo dpkg -i trivy_0.33.0_Linux-64bit.deb
           - script: |
-              trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
+              trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(sumedhdocker)/sumedh03/test:$(Build.BuildId)
           - task: AzureCLI@2
             inputs:
               azureSubscription: 'az-storageaccount-access-test'
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                az storage blob upload --container-name test --file $(Build.ArtifactStagingDirectory)/image-sbom.json --name image-sbom.json --overwrite showing this issue  Job ImageScan: Step input containerRegistry references service connection which could not be found. The service connection does not exist, has been disabled or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz. 
-
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.ArtifactStagingDirectory)/image-sbom.json \
+                  --name image-sbom.json \
+                  --overwrite
