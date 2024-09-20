@@ -66,10 +66,13 @@ stages:
               unzip -q dependency-check-10.0.4-release.zip -d dependency-check
               chmod +x dependency-check/bin/dependency-check.sh
               echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
+              dependency-check/bin/dependency-check.sh --updateonly --connection-string $(NVD_API_KEY)
           - script: |
               dependency-check/bin/dependency-check.sh --project "pygoat-python" --out "$(Build.SourcesDirectory)/dependency-check-report" --scan "$(Build.SourcesDirectory)" --format ALL --failOnCVSS 7 --overwrite
               echo "Dependency Check Report generated at: $(Build.SourcesDirectory)/dependency-check-report"
               ls -la "$(Build.SourcesDirectory)/dependency-check-report"
+              echo "Testing NVD server connection..."
+              curl -I https://nvd.nist.gov/
           - task: AzureCLI@2
             inputs:
               azureSubscription: 'az-storageaccount-access-test'
