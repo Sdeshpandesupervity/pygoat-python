@@ -6,41 +6,10 @@ variables:
 
 stages:
   - stage: AnalysisAndScanning
-    displayName: 'Code Analysis and Security Scanning'
+    displayName: 'Security Scanning'
     jobs:
-      - job: CodeAnalysis
-        steps:
-          - checkout: self
-            fetchDepth: 0
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: '3.x'
-              addToPath: true
-          - script: |
-              python -m pip install --upgrade pip
-              pip install -r requirements.txt
-          - script: |
-              wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.1.0.4477-linux.zip
-              unzip -q sonar-scanner-cli-6.1.0.4477-linux.zip
-              export PATH=$(pwd)/sonar-scanner-*/bin:$PATH
-          - task: SonarQubePrepare@6
-            inputs:
-              SonarQube: 'sonarqube'
-              scannerMode: 'CLI'
-              configMode: 'manual'
-              cliProjectKey: 'python-test'
-              cliSources: '.'
-              extraProperties: |
-                sonar.projectVersion=1.0
-                sonar.host.url=$(SONARQUBE_SERVER)
-                sonar.login=$(SONARQUBE_TOKEN)
-          - task: SonarQubeAnalyze@6
-          - task: SonarQubePublish@6
-            inputs:
-              pollingTimeoutSec: '300'
-
       - job: SecurityScanning
-        displayName: 'Trivy and OWASP Dependency Check'
+        displayName: 'Trivy'
         steps:
           - script: |
               sudo apt-get install -y wget
