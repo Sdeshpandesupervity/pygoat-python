@@ -36,6 +36,7 @@ stages:
                 sonar.projectVersion=1.0
                 sonar.host.url=$(SONARQUBE_SERVER)
                 sonar.login=$(SONARQUBE_TOKEN)
+                sonar.python.version=3.7,3.8,3.9
           - task: SonarQubeAnalyze@6
           - task: SonarQubePublish@6
             inputs:
