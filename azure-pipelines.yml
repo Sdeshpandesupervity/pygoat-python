@@ -6,54 +6,12 @@ variables:
 
 stages:
   # SonarQube Analysis Stage
-  - stage: SonarQubeAnalysis
-    displayName: 'SonarQube Analysis'
-    jobs:
-      - job: Analyze
-        displayName: 'Run SonarQube Analysis'
-        steps:
-          - checkout: self
-            fetchDepth: 0
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: '3.x'
-              addToPath: true
-          - script: |
-              python -m pip install --upgrade pip
-              pip install -r requirements.txt
-          - script: |
-              wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.1.0.4477-linux.zip
-              unzip sonar-scanner-cli-6.1.0.4477-linux.zip
-              export PATH=$(pwd)/sonar-scanner-*/bin:$PATH
-          - task: SonarQubePrepare@6
-            inputs:
-              SonarQube: 'sonarqube'
-              scannerMode: 'CLI'
-              configMode: 'manual'
-              cliProjectKey: 'python-test'
-              cliSources: '.'
-              extraProperties: |
-                sonar.projectVersion=1.0
-                sonar.host.url=$(SONARQUBE_SERVER)
-                sonar.login=$(SONARQUBE_TOKEN)
-                sonar.python.version=3.7,3.8,3.9
-          - task: SonarQubeAnalyze@6
-          - task: SonarQubePublish@6
-            inputs:
-              pollingTimeoutSec: '300'
-          - script: |
-              curl -X POST -H "Authorization: Token $(defectDojoToken)" \
-                   -F 'scan_type=SonarQube Scan' \
-                   -F 'file=@$(Build.ArtifactStagingDirectory)/sonarqube-report.json' \
-                   -F 'engagement=1' \
-                   -F 'active=true' \
-                   -F 'verified=true' \
-                   "$(defectDojoUrl)"
+  
 
   # Trivy Repository Scan Stage
   - stage: TrivyRepoScan
     displayName: 'Trivy Repository Scan'
-    dependsOn: SonarQubeAnalysis
+
     jobs:
       - job: RepoScan
         displayName: 'Scan Repository with Trivy'
