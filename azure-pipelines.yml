@@ -2,13 +2,15 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: StorageVariables
+  - group: StorageVariables # Contains secret variables like SONARQUBE_TOKEN, azureStorageConnectionString, NVD_API_KEY, etc.
 
 stages:
+  # SonarQube Analysis Stage
   - stage: SonarQubeAnalysis
     displayName: 'SonarQube Analysis'
     jobs:
       - job: Analyze
+        displayName: 'Run SonarQube Analysis'
         steps:
           - checkout: self
             fetchDepth: 0
@@ -38,76 +40,88 @@ stages:
           - task: SonarQubePublish@6
             inputs:
               pollingTimeoutSec: '300'
+          - script: |
+              curl -X POST -H "Authorization: Token $(defectDojoToken)" \
+                   -F 'scan_type=SonarQube Scan' \
+                   -F 'file=@$(Build.ArtifactStagingDirectory)/sonarqube-report.json' \
+                   -F 'engagement=1' \
+                   -F 'active=true' \
+                   -F 'verified=true' \
+                   "$(defectDojoUrl)"
 
+  # Trivy Repository Scan Stage
   - stage: TrivyRepoScan
     displayName: 'Trivy Repository Scan'
-    dependsOn:
-    - SonarQubeAnalysis
+    dependsOn: SonarQubeAnalysis
     jobs:
       - job: RepoScan
+        displayName: 'Scan Repository with Trivy'
         steps:
           - script: |
               sudo apt-get install -y wget
               wget https://github.com/aquasecurity/trivy/releases/download/v0.33.0/trivy_0.33.0_Linux-64bit.deb
               sudo dpkg -i trivy_0.33.0_Linux-64bit.deb
           - script: |
-              trivy fs --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json .
+              trivy fs --exit-code 0 --severity CRITICAL,HIGH,LOW --format json --output $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json .
           - script: |
-              az storage blob upload \
-              --container-name test \
-              --file $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json \
-              --name trivy-repo-sbom.json \
-              --connection-string $(azureStorageConnectionString)
+              curl -X POST -H "Authorization: Token $(defectDojoToken)" \
+                   -F 'scan_type=Trivy Scan' \
+                   -F 'file=@$(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json' \
+                   -F 'engagement=1' \
+                   -F 'active=true' \
+                   -F 'verified=true' \
+                   "$(defectDojoUrl)"
 
+  # OWASP Dependency Check Stage
   - stage: OWASPDependencyCheck
     displayName: 'OWASP Dependency Check'
-    dependsOn:
-    - TrivyRepoScan
+    dependsOn: TrivyRepoScan
     jobs:
-    - job: DependencyCheck
-      steps:
-        - script: |
-            wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
-            unzip dependency-check-10.0.4-release.zip -d dependency-check
-            chmod +x dependency-check/bin/dependency-check.sh
-            export PATH=$(pwd)/dependency-check/bin:$PATH
-            echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
-        - script: |
-            dependency-check/bin/dependency-check.sh \
-            --project "pygoat-python" \
-            --out "$(Build.SourcesDirectory)/dependency-check-report" \
-            --scan "$(Build.SourcesDirectory)" \
-            --format ALL --failOnCVSS 7 \
-            --overwrite  # Placed correctly here
-        - script: |
-            tar -czvf $(Build.SourcesDirectory)/dependency-check-report.tar.gz -C $(Build.SourcesDirectory) dependency-check-report
-            az storage blob upload \
-            --container-name test \
-            --name dependency-check-report.tar.gz \
-            --file $(Build.SourcesDirectory)/dependency-check-report.tar.gz \
-            --connection-string "$(azureStorageConnectionString)" \
-            --overwrite  # Placed correctly here
+      - job: DependencyCheck
+        displayName: 'Run OWASP Dependency Check'
+        steps:
+          - script: |
+              wget https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip
+              unzip dependency-check-10.0.4-release.zip -d dependency-check
+              chmod +x dependency-check/bin/dependency-check.sh
+              export PATH=$(pwd)/dependency-check/bin:$PATH
+              echo "nvd.api.key=$(NVD_API_KEY)" > dependency-check.properties
+          - script: |
+              dependency-check/bin/dependency-check.sh \
+              --project "pygoat-python" \
+              --out "$(Build.SourcesDirectory)/dependency-check-report" \
+              --scan "$(Build.SourcesDirectory)" \
+              --format JSON
+          - script: |
+              curl -X POST -H "Authorization: Token $(defectDojoToken)" \
+                   -F 'scan_type=Dependency Check Scan' \
+                   -F 'file=@$(Build.SourcesDirectory)/dependency-check-report/dependency-check-report.json' \
+                   -F 'engagement=1' \
+                   -F 'active=true' \
+                   -F 'verified=true' \
+                   "$(defectDojoUrl)"
 
+  # Build Stage
   - stage: Build
-    displayName: Image Build
+    displayName: 'Image Build'
     jobs:
-    - job: Build
-      displayName: Build and Push the image to ACR
-      pool:
-        vmImage: 'ubuntu-latest'
-      steps:
-      - task: Docker@2
-        inputs:
-          containerRegistry: 'cai-yaml-test'
-          repository: 'test'
-          command: 'buildAndPush'
-          Dockerfile: '**/Dockerfile'
+      - job: Build
+        displayName: 'Build and Push the Image to ACR'
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'sumedhdocker'
+              repository: 'sumedh03/test'
+              command: 'buildAndPush'
+              Dockerfile: '**/Dockerfile'
 
+  # Trivy Image Scan Stage
   - stage: TrivyImageScan
     displayName: 'Trivy Image Scan'
     dependsOn: Build
     jobs:
       - job: ImageScan
+        displayName: 'Scan Container Image with Trivy'
         steps:
           - task: Docker@2
             inputs:
@@ -119,9 +133,12 @@ stages:
               wget https://github.com/aquasecurity/trivy/releases/download/v0.33.0/trivy_0.33.0_Linux-64bit.deb
               sudo dpkg -i trivy_0.33.0_Linux-64bit.deb
           - script: |
-              trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format cyclonedx --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
-              az storage blob upload \
-              --container-name test \
-              --file $(Build.ArtifactStagingDirectory)/image-sbom.json \
-              --name image-sbom.json \
-              --connection-string $(azureStorageConnectionString)
+              trivy image --exit-code 0 --severity CRITICAL,HIGH,LOW --format json --output $(Build.ArtifactStagingDirectory)/image-sbom.json $(containerRegistry)/$(imageName):$(Build.BuildId)
+          - script: |
+              curl -X POST -H "Authorization: Token $(defectDojoToken)" \
+                   -F 'scan_type=Trivy Image Scan' \
+                   -F 'file=@$(Build.ArtifactStagingDirectory)/image-sbom.json' \
+                   -F 'engagement=1' \
+                   -F 'active=true' \
+                   -F 'verified=true' \
+                   "$(defectDojoUrl)"
