@@ -2,7 +2,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: StorageVariables # Contains secret variables like SONARQUBE_TOKEN, azureStorageConnectionString, NVD_API_KEY, etc.
+  - group: StorageVariables # Includes defectDojoUrl, defectDojoToken, azureStorageConnectionString, etc.
 
 stages:
   # SonarQube Analysis Stage
@@ -44,16 +44,28 @@ stages:
           - script: |
               curl -X POST -H "Authorization: Token $(defectDojoToken)" \
                    -F 'scan_type=SonarQube Scan' \
-                   -F 'file=@$(Build.ArtifactStagingDirectory)/sonarqube-report.json' \
-                   -F 'engagement=1' \
+                   -F "file=@$(Build.ArtifactStagingDirectory)/sonarqube-report.json" \
+                   -F "engagement=$(engagementIdSonarQube)" \
                    -F 'active=true' \
                    -F 'verified=true' \
                    "$(defectDojoUrl)"
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'az-storageaccount-access-test'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.ArtifactStagingDirectory)/sonarqube-report.json \
+                  --name sonarqube-report.json \
+                  --overwrite \
+                  --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
 
   # Trivy Repository Scan Stage
   - stage: TrivyRepoScan
     displayName: 'Trivy Repository Scan'
-
     jobs:
       - job: RepoScan
         displayName: 'Scan Repository with Trivy'
@@ -67,11 +79,24 @@ stages:
           - script: |
               curl -X POST -H "Authorization: Token $(defectDojoToken)" \
                    -F 'scan_type=Trivy Scan' \
-                   -F 'file=@$(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json' \
-                   -F 'engagement=1' \
+                   -F "file=@$(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json" \
+                   -F "engagement=$(engagementIdTrivyRepo)" \
                    -F 'active=true' \
                    -F 'verified=true' \
                    "$(defectDojoUrl)"
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'az-storageaccount-access-test'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.ArtifactStagingDirectory)/trivy-repo-sbom.json \
+                  --name trivy-repo-sbom.json \
+                  --overwrite \
+                  --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
 
   # OWASP Dependency Check Stage
   - stage: OWASPDependencyCheck
@@ -96,25 +121,24 @@ stages:
           - script: |
               curl -X POST -H "Authorization: Token $(defectDojoToken)" \
                    -F 'scan_type=Dependency Check Scan' \
-                   -F 'file=@$(Build.SourcesDirectory)/dependency-check-report/dependency-check-report.json' \
-                   -F 'engagement=1' \
+                   -F "file=@$(Build.SourcesDirectory)/dependency-check-report/dependency-check-report.json" \
+                   -F "engagement=$(engagementIdDependencyCheck)" \
                    -F 'active=true' \
                    -F 'verified=true' \
                    "$(defectDojoUrl)"
-
-  # Build Stage
-  - stage: Build
-    displayName: 'Image Build'
-    jobs:
-      - job: Build
-        displayName: 'Build and Push the Image to ACR'
-        steps:
-          - task: Docker@2
+          - task: AzureCLI@2
             inputs:
-              containerRegistry: 'sumedhdocker'
-              repository: 'sumedh03/test'
-              command: 'buildAndPush'
-              Dockerfile: '**/Dockerfile'
+              azureSubscription: 'az-storageaccount-access-test'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.SourcesDirectory)/dependency-check-report/dependency-check-report.json \
+                  --name dependency-check-report.json \
+                  --overwrite \
+                  --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
 
   # Trivy Image Scan Stage
   - stage: TrivyImageScan
@@ -138,8 +162,21 @@ stages:
           - script: |
               curl -X POST -H "Authorization: Token $(defectDojoToken)" \
                    -F 'scan_type=Trivy Image Scan' \
-                   -F 'file=@$(Build.ArtifactStagingDirectory)/image-sbom.json' \
-                   -F 'engagement=1' \
+                   -F "file=@$(Build.ArtifactStagingDirectory)/image-sbom.json" \
+                   -F "engagement=$(engagementIdTrivyImage)" \
                    -F 'active=true' \
                    -F 'verified=true' \
                    "$(defectDojoUrl)"
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'az-storageaccount-access-test'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob upload \
+                  --account-name viswajithcloudshellsa \
+                  --container-name test \
+                  --file $(Build.ArtifactStagingDirectory)/image-sbom.json \
+                  --name image-sbom.json \
+                  --overwrite \
+                  --connection-string $(AZURE_STORAGE_CONNECTION_STRING)
