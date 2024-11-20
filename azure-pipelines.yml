@@ -143,7 +143,7 @@ stages:
   # Trivy Image Scan Stage
   - stage: TrivyImageScan
     displayName: 'Trivy Image Scan'
-    dependsOn: Build
+    dependsOn: OWASPDependencyCheck
     jobs:
       - job: ImageScan
         displayName: 'Scan Container Image with Trivy'
