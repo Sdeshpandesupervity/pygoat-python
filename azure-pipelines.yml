@@ -3,7 +3,8 @@ pool:
 
 variables:
   - group: StorageVariables # Includes defectDojoUrl, defectDojoToken, azureStorageConnectionString, etc.
-
+  - name: SONARQUBE_SERVER
+    value: 'http://4.240.124.40:9000/'
 stages:
   # SonarQube Analysis Stage
   - stage: SonarQubeAnalysis
